@@ -6,16 +6,26 @@ the wording here is a little friendlier than the README.
 
 ## Identity (Partner Center > Product management > Product identity)
 
-Reserve the name **PerformanceTray** in Partner Center, then copy the three values shown there into
-the repository variables `STORE_IDENTITY_NAME`, `STORE_PUBLISHER` and `STORE_PUBLISHER_DISPLAY_NAME`,
-or pass them to `build-msix.ps1` by hand:
+The name **PerformanceTray** is reserved. These are the values Partner Center issued (2026-09-24):
+
+| Field | Value |
+| --- | --- |
+| Package/Identity/Name | `9enki.PerformanceTray` |
+| Package/Identity/Publisher | `CN=25E4528E-D650-45EA-990E-772D522814D6` |
+| Package/Properties/PublisherDisplayName | `9enki` |
+| Package Family Name | `9enki.PerformanceTray_3eayqh5a0wr90` |
+| Store ID | `9N6HWM0261R9` |
+
+The publisher values are the same for every app of the account, so they match PowerModeTray. The MSIX for a
+submission is built locally with them (PowerModeTray was released the same way; the repository variables
+that the Release workflow can use instead were never set):
 
 ```powershell
-.\build-msix.ps1 -IdentityName <Package/Identity/Name> -Publisher '<Package/Identity/Publisher>' -PublisherDisplayName 9enki
+.\build-msix.ps1 -IdentityName 9enki.PerformanceTray -Publisher 'CN=25E4528E-D650-45EA-990E-772D522814D6' -PublisherDisplayName 9enki
 ```
 
-The publisher values are the same for every app of the account, so they match PowerModeTray.
-Only the identity name is new.
+Once the product is live it can be installed with `winget install --id 9N6HWM0261R9 --source msstore`, or from
+`ms-windows-store://pdp/?productid=9N6HWM0261R9`.
 
 ## Properties
 
@@ -154,10 +164,8 @@ README shows.
 ## Submission checklist
 
 1. Tag the release (`git tag v1.0.0 && git push --tags`). The Release workflow builds the exe, the
-   GitHub Release, the winget manifests and, when the three `STORE_*` repository variables are set,
-   the MSIX as the `msix-for-store` artifact
-2. Download the `.msix` from the workflow run, or build it locally with `build-msix.ps1` and the
-   identity values
+   GitHub Release and the winget manifests
+2. Build the `.msix` locally with `build-msix.ps1` and the identity values above
 3. Partner Center > the app > Start your submission > Packages: upload the `.msix`. The Store signs it
 4. Properties, Age ratings, Store listings (en-US and ja-JP): paste the text above and upload the two
    screenshots
