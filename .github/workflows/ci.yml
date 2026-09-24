@@ -1,0 +1,36 @@
+﻿name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      - name: テスト
+        shell: powershell
+        run: .\test.ps1
+
+      - name: ビルド
+        shell: powershell
+        run: .\build.ps1
+
+      - name: MSIX パッケージの構成確認（仮 Identity。配布はしない）
+        shell: powershell
+        run: .\build-msix.ps1 -NoBuild -OutDir dist\msix
+
+      - name: winget マニフェスト
+        shell: powershell
+        run: .\winget\make-manifests.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PerformanceTray
+          path: |
+            bin/PerformanceTray.exe
+            winget/out/**

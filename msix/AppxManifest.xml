@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX パッケージのマニフェスト雛形。build-msix.ps1 が __VERSION__ などを置換して使う。
+  Identity の Name / Publisher は Partner Center でアプリ名を予約すると発行される値と
+  完全に一致させる必要がある（製品の管理 > 製品 ID の「Package/Identity/Name」「Package/Identity/Publisher」）。
+-->
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         IgnorableNamespaces="uap desktop rescap">
+
+  <Identity Name="__IDENTITY_NAME__"
+            Publisher="__PUBLISHER__"
+            Version="__VERSION__.0"
+            ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>PerformanceTray</DisplayName>
+    <PublisherDisplayName>__PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>CPU とメモリの使用率をタスクトレイに数字で表示する最小アプリ</Description>
+  </Properties>
+
+  <Resources>
+    <Resource Language="en-US" />
+    <Resource Language="ja-JP" />
+    <Resource Language="zh-Hans" />
+    <Resource Language="zh-Hant" />
+    <Resource Language="ko-KR" />
+    <Resource Language="de-DE" />
+    <Resource Language="fr-FR" />
+    <Resource Language="es-ES" />
+    <Resource Language="pt-BR" />
+    <Resource Language="it-IT" />
+    <Resource Language="ru-RU" />
+  </Resources>
+
+  <Dependencies>
+    <!-- Windows 10 1809 以降 -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <!-- 通常の Win32 アプリとして動かす（Desktop Bridge） -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="PerformanceTray" Executable="PerformanceTray.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="PerformanceTray"
+                          Description="CPU とメモリの使用率をタスクトレイに数字で表示する"
+                          BackgroundColor="#1FA87A"
+                          Square150x150Logo="Assets\Square150x150Logo.png"
+                          Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"
+                         Square71x71Logo="Assets\Square71x71Logo.png"
+                         Square310x310Logo="Assets\Square310x310Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- ログイン時の自動起動。既定は無効。アプリの右クリックメニュー（StartupTask API）か 設定 > アプリ > スタートアップ で
+             切り替える。TaskId は src/startup.rs の TASK_ID と一致させる -->
+        <desktop:Extension Category="windows.startupTask" Executable="PerformanceTray.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="PerformanceTrayStartup" Enabled="false" DisplayName="PerformanceTray" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

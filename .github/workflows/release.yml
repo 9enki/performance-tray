@@ -1,0 +1,100 @@
+﻿name: Release
+
+# Cargo.toml の version を上げてコミットし、同じ番号のタグ（v1.2.3）を push すると
+#   1. テストとビルド
+#   2. GitHub Release を作成（exe / zip / SHA256SUMS を添付）
+#   3. winget マニフェストを生成し、リポジトリの secret WINGET_TOKEN があれば microsoft/winget-pkgs へ PR を出す
+#   4. Store の Identity を示す変数が設定されていれば、提出用 MSIX を成果物として残す
+#
+# MSIX は Partner Center へ直接アップロードするものなので Release には添付しない。
+# 署名は Store が行うため、リポジトリ変数 STORE_IDENTITY_NAME / STORE_PUBLISHER /
+# STORE_PUBLISHER_DISPLAY_NAME（Partner Center の 製品の管理 > 製品 ID の値）を設定すると生成される。
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+      STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
+      STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
+      STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.STORE_PUBLISHER_DISPLAY_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: タグと Cargo.toml の version の一致を確認
+        shell: powershell
+        run: |
+          # インラインの PowerShell は ASCII のみにする（ランナーの Windows PowerShell 5.1 が UTF-8 を誤読するため）
+          $tag = $env:GITHUB_REF_NAME.TrimStart('v')
+          . .\scripts\common.ps1
+          $ver = Get-ProjectVersion
+          if ($tag -ne $ver) { throw "tag v$tag does not match Cargo.toml version ($ver)" }
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: テスト
+        shell: powershell
+        run: .\test.ps1
+
+      - name: ビルド
+        shell: powershell
+        run: .\build.ps1
+
+      - name: 配布物を作成
+        shell: powershell
+        run: |
+          . .\scripts\common.ps1
+          $ver = Get-ProjectVersion
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item bin\PerformanceTray.exe dist\
+          Compress-Archive -Path bin\PerformanceTray.exe, README.md, LICENSE -DestinationPath "dist\PerformanceTray-$ver.zip" -Force
+          Get-ChildItem dist -File | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } | Set-Content dist\SHA256SUMS.txt -Encoding ascii
+          .\winget\make-manifests.ps1 -Version $ver -Sha256 (Get-FileHash bin\PerformanceTray.exe -Algorithm SHA256).Hash
+          Get-Content dist\SHA256SUMS.txt
+
+      - name: GitHub Release を作成
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          . .\scripts\common.ps1
+          $ver = Get-ProjectVersion
+          $files = Get-ChildItem dist -File | ForEach-Object { $_.FullName }
+          gh release create "v$ver" @files --title "PerformanceTray v$ver" --generate-notes
+
+      - name: winget マニフェストを成果物として保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: winget-manifests
+          path: winget/out/**
+
+      - name: Store 提出用 MSIX を作成（Identity が設定されている場合のみ）
+        if: env.STORE_IDENTITY_NAME != '' && env.STORE_PUBLISHER != ''
+        shell: powershell
+        run: |
+          .\build-msix.ps1 -NoBuild -OutDir dist\msix `
+            -IdentityName $env:STORE_IDENTITY_NAME `
+            -Publisher $env:STORE_PUBLISHER `
+            -PublisherDisplayName $env:STORE_PUBLISHER_DISPLAY_NAME
+
+      - name: MSIX を成果物として保存
+        if: env.STORE_IDENTITY_NAME != '' && env.STORE_PUBLISHER != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: msix-for-store
+          path: dist/msix/*.msix
+
+      - name: winget-pkgs へ PR を提出（WINGET_TOKEN がある場合のみ）
+        if: env.WINGET_TOKEN != ''
+        shell: powershell
+        run: |
+          . .\scripts\common.ps1
+          $ver = Get-ProjectVersion
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          .\wingetcreate.exe submit --token $env:WINGET_TOKEN --prtitle "9enki.PerformanceTray version $ver" "winget\out\manifests\9\9enki\PerformanceTray\$ver"
